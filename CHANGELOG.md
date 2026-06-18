@@ -12,7 +12,7 @@
 - CodeWriter-local Unsplash image search tool.
 - CI workflow with audit, typecheck, build, and smoke checks.
 - Release workflow with package generation, artifact upload, tag handling, and GitHub release creation.
-- Developer README, architecture image, environment example, and release notes.
+- Self-contained developer README, inline architecture diagrams, environment sample, and release notes.
 
 ### Changed
 

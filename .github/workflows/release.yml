@@ -98,7 +98,7 @@ jobs:
             gh release upload "$TAG_NAME" "$ARCHIVE_PATH" --clobber
           else
             gh release create "$TAG_NAME" "$ARCHIVE_PATH" \
-              --title "Mayar Eve Builder ${VERSION_LABEL}" \
-              --notes-file docs/releases/v1.0.0.md \
+              --title "Eveable ${VERSION_LABEL}" \
+              --notes-file README.md \
               "${release_flags[@]}"
           fi

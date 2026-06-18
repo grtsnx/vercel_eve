@@ -21,6 +21,10 @@ const requiredFiles = [
   "agent/tools/start_preview.ts",
   "agent/tools/deploy_to_vercel.ts",
   "README.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "LICENSE",
+  "env.sample",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
 ];
@@ -60,6 +64,19 @@ for (const key of [
 const instructions = readFileSync(join(root, "agent/instructions.md"), "utf8");
 if (!instructions.includes("Every declared subagent call payload must contain exactly one key")) {
   fail("root instructions are missing the Eve subagent call discipline");
+}
+
+const readme = readFileSync(join(root, "README.md"), "utf8");
+if (readme.includes("docs/")) {
+  fail("README should be self-contained and must not link to docs/");
+}
+
+if (existsSync(join(root, "docs"))) {
+  fail("docs folder should not exist; keep project documentation in README.md");
+}
+
+if (existsSync(join(root, ".env.example"))) {
+  fail("use env.sample instead of .env.example");
 }
 
 if (process.exitCode) {
