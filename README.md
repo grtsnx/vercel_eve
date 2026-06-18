@@ -15,6 +15,7 @@ Mayar v1 focuses on generated web applications:
 - App Router
 - Bun as the generated app package manager
 - Local sandbox validation before final summary
+- Vercel preview deployment after validation when `VERCEL_TOKEN` is configured
 - Optional Unsplash image discovery
 - Optional InsForge server-only placeholders for generated backend code
 
@@ -48,6 +49,7 @@ agent/
     ├── write_generated_files.ts
     ├── run_quality_commands.ts
     ├── start_preview.ts
+    ├── deploy_to_vercel.ts
     ├── bash.ts                  # disabled broad shell tool
     └── write_file.ts            # disabled broad file tool
 ```
@@ -65,9 +67,22 @@ agent/
 9. `write_generated_files` writes files under `/workspace/generated-app`.
 10. `run_quality_commands` runs finite commands only.
 11. `autofix` repairs failed builds and validation issues, up to the configured retry limit.
-12. `start_preview` starts the preview process and returns sandbox metadata.
-13. `security_review` checks the generated app before final response.
-14. `conversation` writes the final user-facing summary.
+12. `start_preview` starts the preview process and verifies it over HTTP.
+13. `security_review` checks the generated app before deployment.
+14. `deploy_to_vercel` deploys the sandbox app and verifies the deployment URL.
+15. `conversation` writes the final user-facing summary.
+
+### Where generated code is saved
+
+Generated application files are written inside the Eve sandbox, not directly into this repository:
+
+```text
+/workspace/generated-app
+```
+
+Every successful `write_generated_files`, `run_quality_commands`, `start_preview`, and `deploy_to_vercel` result includes the sandbox id and `workspacePath: "generated-app"`. In the Eve dev TUI or stream output, look for those tool results to inspect the generated file list, commands, preview port, and deployment URL.
+
+For local debugging, you can also ask Mayar to show the generated file list or use the sandbox id from the tool result to inspect the active Eve sandbox workspace.
 
 ### Why subagent calls use `message` only
 
@@ -118,9 +133,15 @@ UNSPLASH_ACCESS_KEY=...
 UNSPLASH_API_BASE_URL=https://api.unsplash.com
 INSFORGE_API_BASE_URL=...
 INSFORGE_API_KEY=...
+VERCEL_TOKEN=...
+VERCEL_PROJECT_NAME=...
+VERCEL_SCOPE=...
+MAYAR_DEPLOY_ENV_ALLOWLIST=...
 ```
 
-Do not put real secrets into generated apps. Mayar treats InsForge values as server-only placeholders and never writes real credentials into generated source files or `.env.local`.
+`VERCEL_TOKEN` is required for generated app deployments. `VERCEL_PROJECT_NAME` and `VERCEL_SCOPE` are optional controls for the destination project/team. `MAYAR_DEPLOY_ENV_ALLOWLIST` can add comma-separated server-only env vars to pass through Vercel deployment flags.
+
+Do not put real secrets into generated apps. Mayar treats server credentials as runtime/deployment values and never writes real credentials into generated source files or generated `.env.local` files.
 
 ## Install
 
@@ -235,9 +256,9 @@ Add a typed Eve tool under `agent/tools/`. Keep root tools narrow and avoid broa
 
 Update `agent/tools/run_quality_commands.ts` and the quality-plan schema in `agent/lib/schemas.ts`.
 
-### Add preview URL support
+### Adjust deployment behavior
 
-Mayar v1 returns sandbox id, preview command, and port. If Eve exposes a preview URL resolver in a later version, add a small adapter around `start_preview` rather than changing the rest of the pipeline.
+Update `agent/tools/deploy_to_vercel.ts` if you want to change the Vercel target, project selection, verification behavior, or server-only env allowlist.
 
 ## Security Model
 
@@ -248,8 +269,9 @@ Mayar v1 returns sandbox id, preview command, and port. If Eve exposes a preview
 - Quality commands are finite.
 - Preview/server commands are separated from validation commands.
 - Real secrets must not be written into generated apps.
-- InsForge values are server-only placeholders.
-- Security review runs after sandbox validation and before final response.
+- InsForge and model-provider values are server-only placeholders.
+- Security review runs after sandbox validation and before Vercel deployment.
+- Vercel deployment runs only through the narrow `deploy_to_vercel` tool and verifies the returned URL before the final response.
 
 ## Version
 

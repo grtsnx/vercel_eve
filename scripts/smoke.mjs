@@ -19,6 +19,7 @@ const requiredFiles = [
   "agent/tools/write_generated_files.ts",
   "agent/tools/run_quality_commands.ts",
   "agent/tools/start_preview.ts",
+  "agent/tools/deploy_to_vercel.ts",
   "README.md",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",

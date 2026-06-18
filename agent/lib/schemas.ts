@@ -205,6 +205,28 @@ export const SandboxValidationResultSchema = z.object({
   nextAgent: z.enum(["autofix", "security_review", "user_approval"]).nullable(),
 });
 
+export const VercelDeploymentResultSchema = z.object({
+  agent: z.literal("vercel_deploy"),
+  status: z.enum(["deployed", "blocked", "failed"]),
+  message: z.string(),
+  target: z.enum(["preview", "production"]),
+  sandboxId: z.string(),
+  workspacePath: z.literal("generated-app"),
+  deploymentUrl: z.string().url().nullable(),
+  inspectUrl: z.string().url().nullable(),
+  projectName: z.string().nullable(),
+  command: z.string().nullable(),
+  verify: z.object({
+    ok: z.boolean(),
+    command: z.string().nullable(),
+    exitCode: z.number().nullable(),
+    stdout: z.string(),
+    stderr: z.string(),
+  }),
+  notes: z.array(z.string()),
+  nextAgent: z.enum(["complete", "autofix", "user_action"]),
+});
+
 export const AutofixResultSchema = z.object({
   agent: z.literal("autofix"),
   status: z.enum(["patched", "blocked"]),
@@ -251,3 +273,4 @@ export type QualityPlan = z.infer<typeof QualityPlanSchema>;
 export type SandboxValidationResult = z.infer<
   typeof SandboxValidationResultSchema
 >;
+export type VercelDeploymentResult = z.infer<typeof VercelDeploymentResultSchema>;
