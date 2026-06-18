@@ -120,7 +120,7 @@ export const GeneratedFileSchema = z.object({
 });
 
 export const QualityPlanSchema = z.object({
-  packageManager: z.literal("bun"),
+  packageManager: z.enum(["bun", "npm", "pnpm", "yarn"]).default("bun"),
   commands: z.array(z.string()),
   previewCommand: z.string(),
   previewPort: z.number().int().positive(),
@@ -140,7 +140,7 @@ export const CodeWriterResultSchema = z.object({
   stack: z.object({
     framework: z.literal("Next.js"),
     language: z.literal("TypeScript"),
-    packageManager: z.literal("bun"),
+    packageManager: z.enum(["bun", "npm", "pnpm", "yarn"]),
     styling: z.array(z.string()),
     backend: z.object({
       provider: z.string(),

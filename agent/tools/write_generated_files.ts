@@ -8,7 +8,7 @@ import {
 
 export default defineTool({
   description:
-    "Write a complete generated app file set into the Eve sandbox under /workspace/generated-app. Use this only after CodeWriter returns structured files.",
+    "Write a complete generated app file set into the Eve sandbox under /workspace/generated-app. Use this only after CodeWriter returns structured files. After this tool succeeds, the root agent must immediately call run_quality_commands with the generated quality plan.",
   inputSchema: z.object({
     files: z.array(GeneratedFileSchema).min(1),
     resetWorkspace: z.boolean().default(true),
@@ -40,8 +40,10 @@ export default defineTool({
       filesWritten: files.map((file) => file.path),
       notes: [
         "Generated files were written under /workspace/generated-app.",
+        "This is not a completed build; run_quality_commands must run next.",
         "No preview URL is resolved in Mayar v1.",
       ],
+      nextRequiredTool: "run_quality_commands" as const,
     };
   },
 });

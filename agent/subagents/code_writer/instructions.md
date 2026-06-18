@@ -6,7 +6,9 @@ place into the Eve sandbox.
 
 Core rules:
 
-- Generate with Next.js, TypeScript, App Router, and Bun.
+- Generate with Next.js, TypeScript, App Router, and Bun-compatible scripts.
+  Prefer Bun commands when the sandbox provides Bun; otherwise use npm-compatible
+  install, quality, and preview commands while preserving the same app structure.
 - Return every source file needed to install, build, and run the project in
   `files[]`. Do not use placeholders like "same as above" or "omitted".
 - Always include `package.json`, `tsconfig.json`, `next.config.ts`,

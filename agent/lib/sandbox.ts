@@ -73,21 +73,23 @@ export function normalizeQualityCommands(
   files: readonly GeneratedFile[],
   qualityPlan: QualityPlan,
 ): string[] {
-  const commands = qualityPlan.commands.filter(
-    (command) =>
-      !isPreviewServerCommand(command) &&
-      normalizeCommandForComparison(command) !==
-        normalizeCommandForComparison(qualityPlan.previewCommand),
-  );
+  const commands = qualityPlan.commands
+    .filter(
+      (command) =>
+        !isPreviewServerCommand(command) &&
+        normalizeCommandForComparison(command) !==
+          normalizeCommandForComparison(qualityPlan.previewCommand),
+    )
+    .map((command) => normalizePackageManagerCommand(command));
   const hasPackageJson = files.some((file) => file.path === "package.json");
   const hasInstall = commands.some((command) =>
-    /^(?:bun|npm|pnpm|yarn)\s+(?:install|i|ci)(?:\s|$)/i.test(
+    /(?:^|then\s+)(?:bun|npm|pnpm|yarn)\s+(?:install|i|ci)(?:\s|;|$)/i.test(
       normalizeCommandForComparison(command),
     ),
   );
 
   if (hasPackageJson && !hasInstall) {
-    return ["bun install", ...commands];
+    return [portablePackageManagerCommand("install"), ...commands];
   }
 
   return commands;
@@ -116,6 +118,55 @@ export function normalizePreviewCommand(command: string, port: number): string {
   }
 
   return trimmed;
+}
+
+function normalizePackageManagerCommand(command: string): string {
+  const normalized = normalizeCommandForComparison(command);
+  const installMatch = normalized.match(/^(bun|npm|pnpm|yarn)\s+(install|i|ci)(?:\s+(.*))?$/i);
+  if (installMatch) {
+    return portablePackageManagerCommand("install", installMatch[3]);
+  }
+
+  const runMatch = normalized.match(/^(bun|npm|pnpm|yarn)(?:\s+run)?\s+([A-Za-z0-9:_-]+)(?:\s+(.*))?$/i);
+  if (runMatch && !["install", "i", "ci"].includes(runMatch[2].toLowerCase())) {
+    return portablePackageManagerCommand("run", runMatch[3], runMatch[2]);
+  }
+
+  return command;
+}
+
+function portablePackageManagerCommand(
+  action: "install" | "run",
+  args = "",
+  script?: string,
+): string {
+  const trimmedArgs = args.trim();
+  const fallbackMessage = "No supported package manager found in sandbox";
+
+  if (action === "install") {
+    const suffix = trimmedArgs ? ` ${trimmedArgs}` : "";
+    return [
+      "if command -v bun >/dev/null 2>&1; then",
+      `bun install${suffix};`,
+      "elif command -v npm >/dev/null 2>&1; then",
+      `npm install${suffix};`,
+      "else",
+      `echo ${shellQuote(fallbackMessage)} >&2; exit 127;`,
+      "fi",
+    ].join(" ");
+  }
+
+  const npmArgs = trimmedArgs ? ` -- ${trimmedArgs}` : "";
+  const bunArgs = trimmedArgs ? ` ${trimmedArgs}` : "";
+  return [
+    "if command -v bun >/dev/null 2>&1; then",
+    `bun run ${script}${bunArgs};`,
+    "elif command -v npm >/dev/null 2>&1; then",
+    `npm run ${script}${npmArgs};`,
+    "else",
+    `echo ${shellQuote(fallbackMessage)} >&2; exit 127;`,
+    "fi",
+  ].join(" ");
 }
 
 export function createInitialBuildStatus(): SandboxValidationResult["buildStatus"] {
@@ -189,7 +240,7 @@ function withServerRuntimeEnv(command: string): string {
     .map(([key, value]) => `${key}=${shellQuote(value)}`)
     .join(" ");
 
-  return prefix ? `${prefix} ${command}` : command;
+  return `${prefix ? `${prefix} ` : ""}bash -lc ${shellQuote(command)}`;
 }
 
 function shellQuote(value: string): string {
