@@ -11,7 +11,7 @@
     "audit": "pnpm audit --prod --audit-level=critical",
     "build": "eve build",
     "ci": "pnpm run audit && pnpm run typecheck && pnpm run build && pnpm run smoke",
-    "dev": "eve dev",
+    "dev": "rm -rf .eve .output && eve dev",
     "smoke": "node scripts/smoke.mjs",
     "start": "eve start",
     "typecheck": "tsgo"

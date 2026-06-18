@@ -35,6 +35,9 @@ Core rules:
 - Mobile navigation should use a Sheet-style pattern and accessible controls.
 - `qualityPlan.commands` must be finite and non-interactive. Do not put preview
   or server commands there.
+- Do not include `next lint` in `qualityPlan.commands` or package scripts unless
+  you also generate a compatible ESLint configuration. The required quality
+  commands are install, typecheck, and build.
 - Put server/preview commands only in `qualityPlan.previewCommand`.
 - The preview command must listen on `0.0.0.0` and use
   `qualityPlan.previewPort`, defaulting to `4173`.

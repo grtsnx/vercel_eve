@@ -73,6 +73,7 @@ export function normalizeQualityCommands(
   files: readonly GeneratedFile[],
   qualityPlan: QualityPlan,
 ): string[] {
+  const packageJson = readGeneratedPackageJson(files);
   const commands = qualityPlan.commands
     .filter(
       (command) =>
@@ -80,7 +81,7 @@ export function normalizeQualityCommands(
         normalizeCommandForComparison(command) !==
           normalizeCommandForComparison(qualityPlan.previewCommand),
     )
-    .map((command) => normalizePackageManagerCommand(command));
+    .map((command) => normalizePackageManagerCommand(command, packageJson));
   const hasPackageJson = files.some((file) => file.path === "package.json");
   const hasInstall = commands.some((command) =>
     /(?:^|then\s+)(?:bun|npm|pnpm|yarn)\s+(?:install|i|ci)(?:\s|;|$)/i.test(
@@ -101,9 +102,18 @@ export function commandInGeneratedWorkspace(command: string): string {
 
 export function normalizePreviewCommand(command: string, port: number): string {
   const trimmed = command.trim();
+  const normalized = normalizeCommandForComparison(trimmed);
 
-  if (trimmed.includes("next dev")) {
-    return trimmed
+  const packageManagerDevMatch = normalized.match(
+    /^(bun|npm|pnpm|yarn)(?:\s+run)?\s+dev(?:\s+(.*))?$/i,
+  );
+  if (packageManagerDevMatch) {
+    const args = normalizePreviewArgs(packageManagerDevMatch[2] ?? "", port);
+    return portablePackageManagerCommand("run", args, "dev");
+  }
+
+  if (normalized.includes("next dev")) {
+    return normalized
       .replace(/\s--port(?:=|\s+)\d+/g, "")
       .replace(/\s-p\s+\d+/g, "")
       .replace(/\s--hostname(?:=|\s+)\S+/g, "")
@@ -120,7 +130,23 @@ export function normalizePreviewCommand(command: string, port: number): string {
   return trimmed;
 }
 
-function normalizePackageManagerCommand(command: string): string {
+function normalizePreviewArgs(args: string, port: number): string {
+  return args
+    .replace(/\s--port(?:=|\s+)\d+/g, "")
+    .replace(/\s-p\s+\d+/g, "")
+    .replace(/\s--hostname(?:=|\s+)\S+/g, "")
+    .replace(/\s-H\s+\S+/g, "")
+    .replace(/^PORT=\d+\s+/, "")
+    .replace(/^HOSTNAME=\S+\s+/, "")
+    .trim()
+    .concat(` -H 0.0.0.0 -p ${port}`)
+    .trim();
+}
+
+function normalizePackageManagerCommand(
+  command: string,
+  packageJson?: Record<string, unknown>,
+): string {
   const normalized = normalizeCommandForComparison(command);
   const installMatch = normalized.match(/^(bun|npm|pnpm|yarn)\s+(install|i|ci)(?:\s+(.*))?$/i);
   if (installMatch) {
@@ -129,6 +155,12 @@ function normalizePackageManagerCommand(command: string): string {
 
   const runMatch = normalized.match(/^(bun|npm|pnpm|yarn)(?:\s+run)?\s+([A-Za-z0-9:_-]+)(?:\s+(.*))?$/i);
   if (runMatch && !["install", "i", "ci"].includes(runMatch[2].toLowerCase())) {
+    if (shouldSkipPackageScript(runMatch[2], packageJson)) {
+      return `echo ${shellQuote(
+        "Skipped obsolete or unsupported generated lint script in this Next.js sandbox.",
+      )}`;
+    }
+
     return portablePackageManagerCommand("run", runMatch[3], runMatch[2]);
   }
 
@@ -226,6 +258,39 @@ function isPreviewServerCommand(command: string): boolean {
       /^(?:vite|astro\s+(?:dev|preview)|remix-serve|serve)(?:\s|$)/,
     ].some((pattern) => pattern.test(segment)),
   );
+}
+
+function readGeneratedPackageJson(
+  files: readonly GeneratedFile[],
+): Record<string, unknown> | undefined {
+  const packageFile = files.find((file) => file.path === "package.json");
+  if (!packageFile) return undefined;
+
+  try {
+    const parsed = JSON.parse(packageFile.content) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function shouldSkipPackageScript(
+  scriptName: string,
+  packageJson?: Record<string, unknown>,
+): boolean {
+  if (scriptName.toLowerCase() !== "lint") return false;
+
+  const scripts = packageJson?.scripts;
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return false;
+  }
+
+  const lintScript = (scripts as Record<string, unknown>).lint;
+  return typeof lintScript === "string" && /\bnext\s+lint\b/.test(lintScript);
 }
 
 function withServerRuntimeEnv(command: string): string {
