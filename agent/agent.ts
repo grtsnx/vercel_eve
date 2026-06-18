@@ -1,5 +1,6 @@
 import { defineAgent } from "eve";
+import { mayarModels } from "./lib/model.js";
 
 export default defineAgent({
-  model: "google/gemini-3-flash",
+  model: mayarModels.root,
 });

@@ -1,14 +1,18 @@
 {
   "name": "mayar",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "packageManager": "pnpm@11.5.0",
   "type": "module",
   "imports": {
     "#*": "./agent/*",
     "#evals/*": "./evals/*"
   },
   "scripts": {
+    "audit": "pnpm audit --prod --audit-level=critical",
     "build": "eve build",
+    "ci": "pnpm run audit && pnpm run typecheck && pnpm run build && pnpm run smoke",
     "dev": "eve dev",
+    "smoke": "node scripts/smoke.mjs",
     "start": "eve start",
     "typecheck": "tsgo"
   },

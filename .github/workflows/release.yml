@@ -1,0 +1,104 @@
+name: Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: Environment to package for
+        required: true
+        default: production
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      version:
+        description: Optional version override, without the leading v
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  package-release:
+    name: Package and release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target_env || 'production' }}
+      PACKAGE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_type == 'tag' && github.ref_name || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit
+        run: pnpm run audit
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Smoke
+        run: pnpm run smoke
+
+      - name: Package for environment
+        id: package
+        run: |
+          chmod +x scripts/package-release.sh
+          scripts/package-release.sh "$RELEASE_ENV" "$PACKAGE_VERSION"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.package_slug }}-${{ steps.package.outputs.release_env }}-${{ steps.package.outputs.version_label }}
+          path: ${{ steps.package.outputs.archive_path }}
+          if-no-files-found: error
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.package.outputs.tag_name }}
+          RELEASE_ENV: ${{ steps.package.outputs.release_env }}
+          VERSION_LABEL: ${{ steps.package.outputs.version_label }}
+          ARCHIVE_PATH: ${{ steps.package.outputs.archive_path }}
+          PRERELEASE: ${{ steps.package.outputs.prerelease }}
+        run: |
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+          fi
+
+          release_flags=()
+          if [[ "$PRERELEASE" == "true" ]]; then
+            release_flags+=(--prerelease)
+          fi
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$ARCHIVE_PATH" --clobber
+          else
+            gh release create "$TAG_NAME" "$ARCHIVE_PATH" \
+              --title "Mayar Eve Builder ${VERSION_LABEL}" \
+              --notes-file docs/releases/v1.0.0.md \
+              "${release_flags[@]}"
+          fi
